@@ -283,14 +283,16 @@ function renderSocial(social) {
   }
 }
 
-function renderSVGBars(svgId, data, color, gradientId, maxFn) {
+function renderSVGBars(svgId, data, color, maxFn) {
   const svg = document.getElementById(svgId)
   if (!svg || !data || !data.length) return
+  const barsGroup = document.getElementById(svgId.replace('Chart','Bars'))
+  if (!barsGroup) return
   const W = 800, H = 260, pad = 30
   const max = maxFn ? maxFn(data) : Math.max(...data.map(d => d.value || 0), 1)
   const barW = Math.max(8, (W - pad * 2) / data.length - 4)
 
-  svg.querySelector(`#${svgId} > g:first-child`).innerHTML = data.map((d, i) => {
+  barsGroup.innerHTML = data.map((d, i) => {
     const h = ((d.value || 0) / max) * (H - pad * 2)
     const x = pad + i * ((W - pad * 2) / data.length) + 2
     const y = H - pad - h
@@ -301,15 +303,15 @@ function renderSVGBars(svgId, data, color, gradientId, maxFn) {
 function renderSVGLine(svgId, data, color, maxFn) {
   const svg = document.getElementById(svgId)
   if (!svg || !data || !data.length) return
+  const lineGroup = document.getElementById(svgId.replace('Chart','Line'))
+  if (!lineGroup) return
   const W = 800, H = 260, pad = 30
   const max = maxFn ? maxFn(data) : Math.max(...data.map(d => d.value || 0), 1)
   const stepX = (W - pad * 2) / Math.max(data.length - 1, 1)
 
-  let d = ""
   const points = data.map((d, i) => ({ x: pad + i * stepX, y: H - pad - ((d.value || 0) / max) * (H - pad * 2) }))
-  d = "M" + points.map(p => `${p.x},${p.y}`).join(" L")
-  svg.querySelector(`#${svgId} > g:nth-child(2)`).innerHTML =
-    `<path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`
+  const d = "M" + points.map(p => `${p.x},${p.y}`).join(" L")
+  lineGroup.innerHTML = `<path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`
 }
 
 function renderCharts(analytics) {
