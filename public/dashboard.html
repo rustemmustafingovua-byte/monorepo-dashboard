@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unified Analytics Dashboard</title>
+<style>
+  :root {
+    --bg: #0b0e11;
+    --bg-2: #0c0f12;
+    --panel: #14181d;
+    --panel-2: #1a1f28;
+    --line: #232a35;
+    --fg: #eaeff3;
+    --muted: #8b949e;
+    --accent: #f0b90b;
+    --accent-dim: rgba(240,185,11,.14);
+    --ok: #3fb950;
+    --err: #f85149;
+    --warn: #d29922;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 20px 80px; }
+  header {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding-bottom: 14px; border-bottom: 1px solid var(--line); margin-bottom: 18px;
+  }
+  h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .pill {
+    font-size: 11px; padding: 3px 10px; border-radius: 999px;
+    background: var(--accent-dim); border: 1px solid rgba(240,185,11,.35); color: var(--accent);
+    font-weight: 700;
+  }
+  .spacer { flex: 1; }
+  .live { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px rgba(63,185,80,.35); }
+  .dot.off { background: var(--err); box-shadow: 0 0 8px rgba(248,81,73,.35); }
+
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin: 14px 0 20px; }
+  .card {
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px;
+    position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(120deg, rgba(240,185,11,.06), transparent 40%);
+    pointer-events: none;
+  }
+  .card b { display: block; font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+  .card span { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--fg); }
+  .card small { color: var(--muted); font-size: 11px; margin-top: 4px; display: block; }
+
+  .section {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 20px; margin-top: 16px;
+  }
+  h2 { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; vertical-align: top; }
+  th { color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  tr:hover td { background: rgba(240,185,11,.03); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #c9d1d9; word-break: break-all; }
+  .empty { color: var(--muted); padding: 12px 0; font-size: 13px; }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .tag.ok { background: rgba(63,185,80,.12); color: var(--ok); border: 1px solid rgba(63,185,80,.35); }
+  .tag.warn { background: rgba(210,153,34,.12); color: var(--warn); border: 1px solid rgba(210,153,34,.35); }
+  .tag.err { background: rgba(248,81,73,.12); color: var(--err); border: 1px solid rgba(248,81,73,.35); }
+
+  footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: #6e7681; font-size: 12px; text-align: center; }
+  a { color: var(--accent); text-decoration: none; }
+  .muted { color: var(--muted); }
+  .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .btn {
+    background: var(--accent); color: #0b0e11; border: none; padding: 8px 14px; border-radius: 8px;
+    font-weight: 800; font-size: 12px; cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.1); }
+
+  .chart { width: 100%; height: 260px; }
+  .chart-sm { height: 180px; }
+
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    h1 { font-size: 18px; }
+  }
+  @media (max-width: 420px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Unified Analytics Dashboard</h1>
+    <span class="pill" id="status">—</span>
+    <div class="spacer"></div>
+    <div class="live">
+      <span class="dot" id="dot"></span>
+      <span id="ts">—</span>
+    </div>
+    <button class="btn" id="csvBtn">Экспорт CSV</button>
+  </header>
+
+  <!-- Summary -->
+  <div class="grid" id="summary"></div>
+
+  <!-- Traffic chart -->
+  <div class="section">
+    <h2>Трафик</h2>
+    <svg class="chart" id="trafficChart" viewBox="0 0 800 260" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f0b90b" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="#f0b90b" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <g id="trafficBars"></g>
+      <g id="trafficLine"></g>
+      <g id="trafficLabels"></g>
+    </svg>
+  </div>
+
+  <!-- Revenue chart -->
+  <div class="section">
+    <h2>Выручка</h2>
+    <svg class="chart" id="revenueChart" viewBox="0 0 800 260" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#3fb950" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="#3fb950" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <g id="revenueBars"></g>
+      <g id="revenueLine"></g>
+      <g id="revenueLabels"></g>
+    </svg>
+  </div>
+
+  <!-- Projects -->
+  <div class="section">
+    <h2>Проекты</h2>
+    <div class="grid" id="project-cards"></div>
+    <table style="margin-top:12px">
+      <thead>
+        <tr><th>Проект</th><th>Метрика</th><th>Значение</th><th>Обновлено</th></tr>
+      </thead>
+      <tbody id="project-rows"></tbody>
+    </table>
+  </div>
+
+  <!-- Leads -->
+  <div class="section">
+    <h2>Лиды</h2>
+    <div class="grid" id="lead-cards"></div>
+    <div id="lead-emails" class="empty">Нет данных</div>
+  </div>
+
+  <!-- Social -->
+  <div class="section">
+    <h2>Соцсети и вовлечение</h2>
+    <div class="grid" id="social-cards"></div>
+    <table style="margin-top:12px">
+      <thead>
+        <tr><th>URL</th><th>Лайки</th><th>Репосты</th><th>Комментарии</th><th>Просмотры</th></tr>
+      </thead>
+      <tbody id="social-rows"></tbody>
+    </table>
+  </div>
+
+  <footer>
+    Unified Analytics Dashboard · <a href="/api/aggregated">JSON</a> · <a href="/api/analytics">Analytics</a> · <a href="/api/revenue">Revenue</a> · <a href="/api/leads">Leads</a> · <a href="/api/social">Social</a>
+  </footer>
+</div>
+
+<script>
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmtNum = (n) => {
+  if (n == null) return "—"
+  const v = Number(n)
+  if (Number.isInteger(v) && Math.abs(v) < 1e6) return v.toLocaleString("ru-RU")
+  return v.toLocaleString("ru-RU", { maximumFractionDigits: 2 })
+}
+const fmtUSD = (n) => {
+  if (n == null) return "—"
+  return "$" + Number(n).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text }
+
+async function loadAll() {
+  const [agg, analytics, leads, revenue, social] = await Promise.all([
+    fetch("/api/aggregated", { cache: "no-store" }).then(r => r.json()).catch(() => null),
+    fetch("/api/analytics", { cache: "no-store" }).then(r => r.json()).catch(() => null),
+    fetch("/api/leads", { cache: "no-store" }).then(r => r.json()).catch(() => null),
+    fetch("/api/revenue", { cache: "no-store" }).then(r => r.json()).catch(() => null),
+    fetch("/api/social", { cache: "no-store" }).then(r => r.json()).catch(() => null),
+  ])
+  return { agg, analytics, leads, revenue, social }
+}
+
+function renderSummary(agg) {
+  const projects = agg?.projects || {}
+  const totalRevenue = (projects.lumen?.x402Revenue || 0) + (projects.agent?.x402Revenue || 0) + (projects.perps?.revenue || 0)
+  const totalRequests = (projects.perps?.requests || 0) + (projects.agent?.requests || 0)
+  const totalScans = projects.wallet?.scans || 0
+  const totalLeads = agg?.analytics?.leads?.total || 0
+
+  const cards = [
+    { label: "Общая выручка", value: fmtUSD(totalRevenue), sub: "x402 + perps + staking + LP" },
+    { label: "Запросы", value: fmtNum(totalRequests), sub: "perps + agent" },
+    { label: "Сканы кошельков", value: fmtNum(totalScans), sub: "wallet-hygiene" },
+    { label: "Лиды", value: fmtNum(totalLeads), sub: "email-запросы" },
+  ]
+  document.getElementById("summary").innerHTML = cards.map(c =>
+    `<div class="card"><b>${esc(c.label)}</b><span>${esc(c.value)}</span><small>${esc(c.sub)}</small></div>`
+  ).join("")
+}
+
+function renderProjects(agg) {
+  const p = agg?.projects || {}
+  const rows = [
+    ["Lumen Chain", "Блоки", p.lumen?.blocks, "Стейк", fmtNum(p.lumen?.staked)],
+    ["Lumen Chain", "x402 платежи", fmtNum(p.lumen?.x402Payments) + " ($" + fmtNum(p.lumen?.x402Revenue) + ")", "Валидаторы", fmtNum(p.lumen?.validators)],
+    ["Perps Funding Pulse", "Запросы", fmtNum(p.perps?.requests), "Выручка", fmtUSD(p.perps?.revenue)],
+    ["Perps Funding Pulse", "Funding rates", fmtNum((p.perps?.fundingRates || []).length) + " записей", "Объём", fmtNum(p.perps?.volume)],
+    ["Agent X402", "Запросы", fmtNum(p.agent?.requests), "Выручка", fmtUSD(p.agent?.revenue)],
+    ["Agent X402", "x402 платежи", fmtNum(p.agent?.x402Payments) + " ($" + fmtNum(p.agent?.x402Revenue) + ")", "—", "—"],
+    ["Wallet Hygiene", "Сканы", fmtNum(p.wallet?.scans), "Найдено ключей", fmtNum(p.wallet?.keysFound)],
+  ]
+
+  document.getElementById("project-rows").innerHTML = rows.map(r =>
+    `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3]) || "—"}</td></tr>`
+  ).join("")
+
+  const cards = [
+    { title: "Lumen Chain", body: `Блоки: ${fmtNum(p.lumen?.blocks)} · Стейк: ${fmtNum(p.lumen?.staked)} · x402: ${fmtNum(p.lumen?.x402Payments)}` },
+    { title: "Perps Funding Pulse", body: `Запросы: ${fmtNum(p.perps?.requests)} · Выручка: ${fmtUSD(p.perps?.revenue)}` },
+    { title: "Agent X402", body: `Запросы: ${fmtNum(p.agent?.requests)} · Выручка: ${fmtUSD(p.agent?.revenue)}` },
+    { title: "Wallet Hygiene", body: `Сканы: ${fmtNum(p.wallet?.scans)} · Ключей найдено: ${fmtNum(p.wallet?.keysFound)}` },
+  ]
+  document.getElementById("project-cards").innerHTML = cards.map(c =>
+    `<div class="card"><b>${esc(c.title)}</b><span style="font-size:14px;font-weight:600">${esc(c.body)}</span></div>`
+  ).join("")
+}
+
+function renderLeads(leads) {
+  if (!leads) return
+  const l = leads
+  document.getElementById("lead-cards").innerHTML = `
+    <div class="card"><b>Всего лидов</b><span>${fmtNum(l.total)}</span><small>Всего</small></div>
+    <div class="card"><b>Сегодня</b><span>${fmtNum(l.daily)}</span><small>Новые за день</small></div>
+    <div class="card"><b>Конверсия</b><span>${l.total ? (l.daily / Math.max(l.total, 1) * 100).toFixed(1) + "%" : "0%"}</span><small>Доля сегодня</small></div>
+  `
+  if (l.emails && l.emails.length) {
+    document.getElementById("lead-emails").innerHTML = `<div class="mono">${l.emails.map(e => esc(e)).join("<br>")}</div>`
+  }
+}
+
+function renderSocial(social) {
+  if (!social) return
+  const s = social
+  document.getElementById("social-cards").innerHTML = `
+    <div class="card"><b>Просмотры</b><span>${fmtNum(s.engagement?.views || 0)}</span></div>
+    <div class="card"><b>Лайки</b><span>${fmtNum(s.engagement?.likes || 0)}</span></div>
+    <div class="card"><b>Репосты</b><span>${fmtNum(s.engagement?.shares || 0)}</span></div>
+    <div class="card"><b>Комментарии</b><span>${fmtNum(s.engagement?.comments || 0)}</span></div>
+  `
+  if (s.posts && s.posts.length) {
+    document.getElementById("social-rows").innerHTML = s.posts.slice(0, 50).map(p =>
+      `<tr><td class="mono">${esc(p.url || p.title || "")}</td><td>${fmtNum(p.likes || 0)}</td><td>${fmtNum(p.shares || 0)}</td><td>${fmtNum(p.comments || 0)}</td><td>${fmtNum(p.views || 0)}</td></tr>`
+    ).join("")
+  }
+}
+
+function renderSVGBars(svgId, data, color, gradientId, maxFn) {
+  const svg = document.getElementById(svgId)
+  if (!svg || !data || !data.length) return
+  const W = 800, H = 260, pad = 30
+  const max = maxFn ? maxFn(data) : Math.max(...data.map(d => d.value || 0), 1)
+  const barW = Math.max(8, (W - pad * 2) / data.length - 4)
+
+  svg.querySelector(`#${svgId} > g:first-child`).innerHTML = data.map((d, i) => {
+    const h = ((d.value || 0) / max) * (H - pad * 2)
+    const x = pad + i * ((W - pad * 2) / data.length) + 2
+    const y = H - pad - h
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${color}" opacity="0.9" rx="2"/>`
+  }).join("")
+}
+
+function renderSVGLine(svgId, data, color, maxFn) {
+  const svg = document.getElementById(svgId)
+  if (!svg || !data || !data.length) return
+  const W = 800, H = 260, pad = 30
+  const max = maxFn ? maxFn(data) : Math.max(...data.map(d => d.value || 0), 1)
+  const stepX = (W - pad * 2) / Math.max(data.length - 1, 1)
+
+  let d = ""
+  const points = data.map((d, i) => ({ x: pad + i * stepX, y: H - pad - ((d.value || 0) / max) * (H - pad * 2) }))
+  d = "M" + points.map(p => `${p.x},${p.y}`).join(" L")
+  svg.querySelector(`#${svgId} > g:nth-child(2)`).innerHTML =
+    `<path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`
+}
+
+function renderCharts(analytics) {
+  if (!analytics) return
+  const t = analytics.traffic || {}
+  const r = analytics.revenue || {}
+
+  const trafficData = [
+    { label: "День", value: t.daily || 0 },
+    { label: "Неделя", value: t.weekly || 0 },
+    { label: "Месяц", value: t.monthly || 0 },
+  ]
+  renderSVGBars("trafficChart", trafficData, "#f0b90b", "url(#tg)", d => Math.max(...d.map(x => x.value), 1))
+
+  const revData = [
+    { label: "x402", value: r.x402 || 0 },
+    { label: "Staking", value: r.staking || 0 },
+    { label: "LP", value: r.lp || 0 },
+    { label: "Perps", value: r.perps || 0 },
+  ]
+  renderSVGBars("revenueChart", revData, "#3fb950", "url(#rg)", d => Math.max(...d.map(x => x.value), 1))
+}
+
+async function load() {
+  try {
+    const { agg, analytics, leads, revenue, social } = await loadAll()
+    setText("status", "Live")
+    document.getElementById("dot").classList.remove("off")
+    setText("ts", "обновлено " + new Date().toLocaleTimeString("ru"))
+
+    renderSummary(agg)
+    renderProjects(agg)
+    renderLeads(leads)
+    renderSocial(social)
+    renderCharts(analytics)
+  } catch (e) {
+    setText("status", "Ошибка")
+    document.getElementById("dot").classList.add("off")
+    setText("ts", "нет данных")
+  }
+}
+
+document.getElementById("csvBtn").addEventListener("click", () => {
+  const rows = [["source", "metric", "value", "ts"]]
+  const push = (source, metric, value) => rows.push([source, metric, String(value), new Date().toISOString()])
+  const addObj = (source, obj) => {
+    if (!obj || typeof obj !== "object") return
+    for (const [k, v] of Object.entries(obj)) {
+      if (v && typeof v === "object" && !Array.isArray(v)) addObj(`${source}.${k}`, v)
+      else push(source, k, v)
+    }
+  }
+  const csvContent = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `dashboard-${new Date().toISOString().slice(0,10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+})
+
+load()
+setInterval(load, 15000)
+</script>
+</body>
+</html>
